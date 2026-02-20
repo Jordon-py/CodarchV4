@@ -1,14 +1,7 @@
-//import {useState} from 'react'
-import NewSnippet from './components/newSnippet.jsx'
-import './App.css'
+import Page from "./components/Page.jsx";
 
 function App() {
-  return (
-    <>
-      <div>
-        <NewSnippet ClassName='snippet-form' />
-      </div>
-    </>
-  )
+  return <Page />;
 }
-export default App
+
+export default App;

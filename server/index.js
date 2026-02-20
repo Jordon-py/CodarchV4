@@ -4,173 +4,80 @@
  * ============================================================
  *
  *  This file boots the Express application that powers the
- *  CodeArchive REST API, a service for storing and retrieving
- *  reusable code snippets.
+ *  CodeArchive REST API.
  *
  *  Startup sequence:
- *    1. Load environment variables from .env (via dotenv).
- *    2. Create the Express app and register global middleware.
- *    3. Connect to MongoDB Atlas through Mongoose (single
- *       shared connection pool — stays open for the lifetime
- *       of the process).
- *    4. Mount API routers under the /api namespace.
- *    5. Register 404 & centralized error-handling middleware.
- *    6. Bind to PORT and begin accepting HTTP requests.
- *
- *  Key exports:
- *    • app  — The Express instance (useful for testing or
- *             embedding in a larger server).
- *
- *  Environment variables (see .env):
- *    • MONGODB_URI      — Full MongoDB connection string (REQUIRED).
- *    • PORT             — HTTP port (default 3000).
- *    • ALLOWED_ORIGINS  — Comma-separated list of CORS origins
- *                         (default http://localhost:5173).
+ *    1. Load environment variables.
+ *    2. Create Express app & middleware.
+ *    3. Connect successfully to MongoDB via Mongoose.
+ *    4. Mount API routes.
+ *    5. Start listening on PORT.
  * ============================================================
  */
 
-// ──────────────────────────────────────────────────────────────
-//  Dependencies
-// ──────────────────────────────────────────────────────────────
-const express  = require('express');   // Core web framework (v5)
-const mongoose = require('mongoose');  // ODM for MongoDB — manages schemas, queries, connection pooling
-const dotenv   = require('dotenv');    // Reads .env into process.env
-const cors     = require('cors');      // Cross-Origin Resource Sharing middleware
+const express  = require('express');
+const mongoose = require('mongoose');
+const dotenv   = require('dotenv');
+const cors     = require('cors');
 
-// ──────────────────────────────────────────────────────────────
-//  Bootstrap
-// ──────────────────────────────────────────────────────────────
-
+// 1. Setup App & Config
 const app = express();
-
-// Load .env BEFORE any code reads process.env
 dotenv.config({ path: './.env' });
+const PORT = process.env.PORT || 3001;
 
-// Fallback port if not set in environment
-const PORT = process.env.PORT || 3000;
 
-// ──────────────────────────────────────────────────────────────
-//  CORS — restrict which front-end origins may call this API
-// ──────────────────────────────────────────────────────────────
-//  The ALLOWED_ORIGINS env var is a comma-separated string.
-//  Example: "http://localhost:5173,https://codarch.example.com"
-//  If omitted, only http://localhost:5173 (Vite dev server) is
-//  allowed by default.
-// ──────────────────────────────────────────────────────────────
+// 2. Middleware
+// CORS: Allow specific origins (or default to Vite dev server)
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
   .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean);  // Drop empty strings produced by trailing commas
+  .map(o => o.trim())
+  .filter(Boolean);
 
 if (allowedOrigins.length > 0) {
   app.use(cors({
-    origin: allowedOrigins,                 // Only these origins may call the API
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Allowed HTTP verbs
-    credentials: true                       // Allow cookies / Authorization headers
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
   }));
 }
 
-// ──────────────────────────────────────────────────────────────
-//  Global Middleware
-// ──────────────────────────────────────────────────────────────
-//  express.json() parses incoming request bodies with
-//  Content-Type: application/json and exposes the result
-//  on req.body. Without this, req.body would be undefined
-//  for POST/PUT requests.
-// ──────────────────────────────────────────────────────────────
-app.use(express.json());
+app.use(express.json()); // Parse JSON bodies
 
-// ──────────────────────────────────────────────────────────────
-//  Mongoose Connection (runs once at startup)
-// ──────────────────────────────────────────────────────────────
-//  Mongoose maintains a single connection pool internally.
-//  Once connected here, every model query in the app reuses
-//  this pool — no need to pass a db handle around.
-//
-//  If MONGODB_URI is missing we throw immediately so the
-//  process exits with a clear message instead of silently
-//  failing on the first request.
-// ──────────────────────────────────────────────────────────────
+// 3. Database Connection
+// We MUST use mongoose.connect() because our models (Snippets.js) use Mongoose.
+// The native MongoClient code (from Atlas tutorials) does NOT connect Mongoose.
 (async () => {
   if (!process.env.MONGODB_URI) {
-    throw new Error(
-      'MONGODB_URI is required — set it in server/.env or your environment'
-    );
+    throw new Error('MONGODB_URI is required in .env');
   }
 
-  
-  const { MongoClient, ServerApiVersion } = require('mongodb');
-  const uri = process.env.MONGODB_URI;
-
-  // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-  const client = new MongoClient(uri, {
-    serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
-    }
-  });
-
-  async function run() {
-    try {
-      // Connect the client to the server	(optional starting in v4.7)
-      await client.connect();
-      // Send a ping to confirm a successful connection
-      await client.db("admin").command({ ping: 1 });
-      console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-      // Ensures that the client will close when you finish/error
-      await client.close();
-    }
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ MongoDB connected via Mongoose');
+  } catch (err) {
+    console.error('❌ MongoDB Connection Error:', err.message);
+    process.exit(1);
   }
-  run().catch(console.dir);
+})();
 
-// ──────────────────────────────────────────────────────────────
-//  API Routes
-// ──────────────────────────────────────────────────────────────
-//  Rule of thumb: mount all routers BEFORE the 404 and error
-//  middleware so that valid routes are matched first.
-//
-//  To add a new resource (e.g., Users), create a router in
-//  ./routes/usersRouter.js, then mount it here:
-//    const usersRouter = require('./routes/usersRouter');
-//    app.use('/api/users', usersRouter);
-// ──────────────────────────────────────────────────────────────
+// 4. Routes
+// Mount routers BEFORE error handlers
 const snippetsRouter = require('./routes/snippetsRouter');
 app.use('/api/snippets', snippetsRouter);
 
-// ──────────────────────────────────────────────────────────────
-//  404 Handler — catches any request that didn't match a route
-// ──────────────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
+// 404 Handler
+app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
-// ──────────────────────────────────────────────────────────────
-//  Centralized Error Handler
-// ──────────────────────────────────────────────────────────────
-//  Express recognises this as an error middleware because it
-//  has exactly four parameters (err, req, res, next).
-//  Any call to next(err) inside a route handler will land here.
-//
-//  NOTE: In production you should avoid leaking err.message to
-//  the client — it may contain stack traces or sensitive info.
-// ──────────────────────────────────────────────────────────────
-app.use((err, _req, res, _next) => {
-  console.error('🔥 Error handler:', err);
-  const status = err.status || 500;
-  res.status(status).json({
+// Error Handler
+app.use((err, req, res, next) => {
+  console.error('🔥 Server Error:', err);
+  res.status(err.status || 500).json({
     error: 'Server Error',
     detail: err.message
   });
 });
 
-// ──────────────────────────────────────────────────────────────
-//  Launch the Server
-// ──────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 CodeArchive API listening on http://localhost:${PORT}`);
-});
+// 5. Start Server
+app.listen(PORT, "0.0.0.0", () => console.log(`API on ${PORT}`));
 
-// Export for integration tests or programmatic embedding
-module.exports = app;})
+module.exports = app;
