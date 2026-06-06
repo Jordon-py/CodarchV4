@@ -1,5 +1,5 @@
 //import {useState} from 'react'
-import NewSnippet from './components/newSnippet.jsx'
+import NewSnippet from '../components/NewSnippet.jsx'
 import './App.css'
 
 function App() {

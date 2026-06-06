@@ -1,8 +1,8 @@
-import {useState, useRef, useEffect} from "react";
 import axios from "axios";
+import { useEffect, useRef, useState } from "react";
 
 // Set axios base URL globally
-axios.defaults.baseURL = 'http://localhost:3000/api';  // Standardized base URL for consistency
+axios.defaults.baseURL = 'https://code-archive-server-production.up.railway.app/api';  // Standardized base URL for consistency
 
 
 
@@ -11,23 +11,20 @@ export default function NewSnippet() {
   const [title, setTitle] = useState("name your snippet");
   const [language, setLanguage] = useState('JavaScript');
   const [code, setCode] = useState('// your code here');
-  const [version, setVersion] = useState(1);
+  const [version, setVersion] = useState(0.1);
   const [author, setAuthor] = useState(null);
   const [snippets, setSnippets] = useState([]);  // Array to store fetched snippets
   const formRef = useRef(null);
-
-  // Fetch snippets on component mount
+  
   useEffect(() => {
-    const fetchSnippets = async () => {
-      try {
-        const response = await axios.get('/snippets');  // Use relative path with baseURL
-        setSnippets(response.data.items || []);  // Update state with response.items
-      } catch (error) {
-        console.error('Failed to fetch snippets:', error);  // Handle errors gracefully
-      }
-    };
-    fetchSnippets();  // Call immediately
-  }, []);  // Empty dependency array = run once on component mount
+    axios.get('/snippets')
+      .then(response => {
+        setSnippets(response.data.items || []);
+      })
+      .catch(error => {
+        console.error('Failed to fetch snippets:', error);
+      });
+  }, []);
 
   const createParticles = () => {
     const container = document.createElement('div');
@@ -90,7 +87,7 @@ export default function NewSnippet() {
         author: author,  // Include author as string (schema updated accordingly)
       });
       console.log('Created snippet id:', response.data?._id);
-      console.log(response.data)
+      console.log(response.data);
 
       // Refetch to update list
       const fetchResponse = await axios.get('/snippets');  // Use relative path with baseURL

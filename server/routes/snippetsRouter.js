@@ -21,6 +21,10 @@ const express = require('express');                     // Router from Express
 const router = express.Router();                        // Dedicated router instance
 const Snippet = require('../models/Snippets.js');          // Mongoose model (default export)
 
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // GET /api/snippets?skip=0&limit=20
 router.get('/', async (req, res, next) => {
   try {

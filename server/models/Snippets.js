@@ -20,8 +20,7 @@ const mongoose = require('mongoose');                   // ODM
 const {Schema} = mongoose;                            // Build schema definitions
 
 const snippetSchema = new Schema(
-  {
-    title: {
+  { title: {
       type: String,
       required: true,
       trim: true,
@@ -49,13 +48,14 @@ const snippetSchema = new Schema(
     },
     author: {
       type: String,
+      ref: 'User',
       required: false                                   // Changed to String for now, until User model exists
     }
   },
-  {timestamps: true}                                   // createdAt, updatedAt
+  { timestamps: true }                                   // createdAt, updatedAt
 );
 
 // Helpful index for common list views (author’s recent snippets)
-snippetSchema.index({author: 1, createdAt: -1});
+snippetSchema.index({ author: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Snippet', snippetSchema); // Export compiled model
