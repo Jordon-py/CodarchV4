@@ -14,7 +14,7 @@
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
     "mongodb": "^6.20.0",
-    "mongoose": "^8.19.1",
+    "mongoose": "^8.24.1",
     "nodemon": "^3.1.10",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
